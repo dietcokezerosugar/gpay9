@@ -1,0 +1,14 @@
+node_modules/
+logs/
+data/
+downloads/
+session-*/
+.env
+*.log
+config/accounts.json
+config.json
+audit.js
+humanize.js
+test-*.js
+master-test.js
+sync-local.js

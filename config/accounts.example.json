@@ -1,0 +1,19 @@
+{
+    "webhook_url": "",
+    "secondary_webhook_url": "",
+    "telegram_bot_token": "",
+    "telegram_chat_id": "",
+    "download_interval_sec": 10,
+    "dashboard_username": "admin",
+    "dashboard_password": "changeme",
+    "webhook_status_secret": "changeme-secret",
+    "accounts": [
+        {
+            "name": "example-account",
+            "email": "example@gmail.com",
+            "password": "",
+            "report_id": "",
+            "proxy_url": null
+        }
+    ]
+}
