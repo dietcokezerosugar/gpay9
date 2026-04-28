@@ -1,4 +1,4 @@
-
+﻿
 const express = require('express');
 const { chromium } = require('playwright');
 const path = require('path');
@@ -61,18 +61,17 @@ app.get('/', (req, res) => {
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${ACCOUNT_NAME} — Dual Engine Control</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+<style>    * { margin: 0; padding: 0; box-sizing: border-box; }
     :root {
-        --bg-primary: #0a0e1a;
-        --bg-card: rgba(15, 23, 42, 0.7);
-        --bg-card-hover: rgba(30, 41, 59, 0.6);
-        --border: rgba(99, 102, 241, 0.15);
-        --border-glow: rgba(99, 102, 241, 0.3);
-        --text-primary: #f1f5f9;
+        --bg-primary: #020617;
+        --bg-card: #0f172a;
+        --bg-card-hover: #1e293b;
+        --border: rgba(34,211,238,0.3);
+        --border-glow: rgba(34,211,238,0.6);
+        --text-primary: #e2e8f0;
         --text-muted: #64748b;
-        --accent-blue: #6366f1;
         --accent-cyan: #22d3ee;
+        --accent-blue: #3b82f6;
         --accent-green: #10b981;
         --accent-amber: #f59e0b;
         --accent-red: #ef4444;
@@ -81,15 +80,17 @@ app.get('/', (req, res) => {
     body { 
         background: var(--bg-primary); 
         color: var(--text-primary); 
-        font-family: 'Inter', sans-serif; 
+        font-family: 'JetBrains Mono', monospace; 
         min-height: 100vh;
         overflow-x: hidden;
     }
     body::before {
         content: '';
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: radial-gradient(ellipse at 20% 20%, rgba(99,102,241,0.08) 0%, transparent 50%),
-                    radial-gradient(ellipse at 80% 80%, rgba(34,211,238,0.05) 0%, transparent 50%);
+        background-image: 
+            linear-gradient(rgba(34,211,238,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(34,211,238,0.03) 1px, transparent 1px);
+        background-size: 30px 30px;
         pointer-events: none; z-index: 0;
     }
 
@@ -97,71 +98,69 @@ app.get('/', (req, res) => {
 
     .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
     .header-left { display: flex; align-items: center; gap: 16px; }
-    .bot-avatar { width: 48px; height: 48px; border-radius: 14px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; color: white; box-shadow: 0 0 20px rgba(99,102,241,0.3); }
-    .bot-name { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-    .bot-email { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+    .bot-avatar { font-size: 14px; font-weight: 700; color: var(--accent-cyan); padding: 4px 8px; border: 1px solid var(--accent-cyan); background: rgba(34,211,238,0.1); }
+    .bot-name { font-size: 20px; font-weight: 700; color: var(--accent-cyan); }
+    .bot-email { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
     .header-right { display: flex; align-items: center; gap: 14px; }
-    .live-indicator { display: flex; align-items: center; gap: 8px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--accent-green); text-transform: uppercase; letter-spacing: 1px; }
-    .live-dot { width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
-    @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 50% { opacity: 0.7; box-shadow: 0 0 0 8px rgba(16,185,129,0); } }
-    .uptime-badge { color: var(--text-muted); font-size: 12px; font-family: 'JetBrains Mono', monospace; background: var(--bg-card); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; }
+    .live-indicator { display: flex; align-items: center; gap: 8px; border: 1px solid var(--accent-green); padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--accent-green); text-transform: uppercase; letter-spacing: 1px; background: rgba(16,185,129,0.1); }
+    .live-dot { width: 8px; height: 8px; background: var(--accent-green); animation: pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 50% { opacity: 0.5; box-shadow: 0 0 0 6px rgba(16,185,129,0); } }
+    .uptime-badge { color: var(--text-muted); font-size: 11px; background: var(--bg-card); border: 1px solid var(--border); padding: 4px 10px; }
 
     .engines-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-    .engine-card { background: var(--bg-card); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 14px; padding: 20px; transition: all 0.3s; }
-    .engine-card:hover { border-color: var(--border-glow); transform: translateY(-1px); }
-    .engine-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .engine-card { background: var(--bg-card); border: 1px solid var(--border); padding: 20px; transition: all 0.3s; position: relative; }
+    .engine-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background: var(--accent-blue); }
+    .engine-card.engine-b::before { background: var(--accent-amber); }
+    .engine-card:hover { border-color: var(--accent-cyan); box-shadow: inset 0 0 20px rgba(34,211,238,0.05); }
+    .engine-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 10px; }
     .engine-title { display: flex; align-items: center; gap: 10px; }
-    .engine-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
-    .engine-a .engine-icon { background: rgba(99,102,241,0.15); color: var(--accent-blue); }
-    .engine-b .engine-icon { background: rgba(245,158,11,0.15); color: var(--accent-amber); }
-    .engine-label { font-size: 14px; font-weight: 600; }
-    .engine-sublabel { font-size: 11px; color: var(--text-muted); }
-    .engine-status { font-size: 11px; padding: 4px 10px; border-radius: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .status-armed { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+    .engine-icon { font-size: 12px; font-weight: 700; padding: 2px 6px; border: 1px solid currentColor; }
+    .engine-a .engine-icon { color: var(--accent-blue); background: rgba(59,130,246,0.1); }
+    .engine-b .engine-icon { color: var(--accent-amber); background: rgba(245,158,11,0.1); }
+    .engine-label { font-size: 14px; font-weight: 600; color: #fff; }
+    .engine-sublabel { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+    .engine-status { font-size: 10px; padding: 2px 6px; border: 1px solid var(--accent-green); color: var(--accent-green); text-transform: uppercase; letter-spacing: 0.5px; }
     .engine-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .engine-stat { background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px 12px; }
+    .engine-stat { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); padding: 10px 12px; }
     .engine-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
-    .engine-stat-value { font-size: 20px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .engine-stat-value { font-size: 18px; font-weight: 700; }
     .val-blue { color: var(--accent-cyan); }
     .val-green { color: var(--accent-green); }
     .val-amber { color: var(--accent-amber); }
 
     .summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
-    .summary-item { background: var(--bg-card); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
-    .summary-item .s-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
-    .summary-item .s-value { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .summary-item { background: var(--bg-card); border: 1px solid var(--border); padding: 16px; text-align: center; }
+    .summary-item .s-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+    .summary-item .s-value { font-size: 20px; font-weight: 700; }
 
-    .recent-txns { background: var(--bg-card); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; max-height: 200px; overflow-y: auto; }
-    .recent-txns h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-    .txn-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; animation: slideIn 0.3s ease; }
+    .recent-txns { background: var(--bg-card); border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; max-height: 200px; overflow-y: auto; }
+    .recent-txns h3 { font-size: 12px; font-weight: 700; margin-bottom: 12px; color: var(--accent-cyan); border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; }
+    .txn-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed rgba(255,255,255,0.1); font-size: 12px; animation: slideIn 0.3s ease; }
     .txn-row:last-child { border: none; }
-    .txn-payer { color: var(--text-primary); font-weight: 500; flex: 1; }
-    .txn-amount { color: var(--accent-green); font-weight: 700; font-family: 'JetBrains Mono', monospace; margin: 0 16px; }
-    .txn-engine { font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 600; text-transform: uppercase; }
-    .txn-engine.a { background: rgba(99,102,241,0.15); color: var(--accent-blue); }
-    .txn-engine.b { background: rgba(245,158,11,0.15); color: var(--accent-amber); }
-    .txn-time { color: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; margin-left: 12px; min-width: 60px; text-align: right; }
+    .txn-payer { color: #fff; font-weight: 500; flex: 1; }
+    .txn-amount { color: var(--accent-green); font-weight: 700; margin: 0 16px; }
+    .txn-engine { font-size: 10px; padding: 2px 6px; border: 1px solid currentColor; font-weight: 600; text-transform: uppercase; }
+    .txn-engine.a { color: var(--accent-blue); background: rgba(59,130,246,0.1); }
+    .txn-engine.b { color: var(--accent-amber); background: rgba(245,158,11,0.1); }
+    .txn-time { color: var(--text-muted); font-size: 10px; margin-left: 12px; min-width: 60px; text-align: right; }
     @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-    .empty-txn { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px; }
+    .empty-txn { color: var(--text-muted); font-size: 12px; text-align: center; padding: 20px; font-style: italic; }
 
-    .terminal { background: var(--bg-card); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-    .terminal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-bottom: 1px solid var(--border); }
-    .terminal-dots { display: flex; gap: 6px; }
-    .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
-    .terminal-dot.r { background: #ef4444; } .terminal-dot.y { background: #f59e0b; } .terminal-dot.g { background: #10b981; }
-    .terminal-title { font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-    .terminal-body { padding: 16px 18px; max-height: 280px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; }
-    .terminal-body div { padding: 1px 0; }
-    .terminal-body::-webkit-scrollbar { width: 6px; }
+    .terminal { background: #000; border: 1px solid var(--border); overflow: hidden; }
+    .terminal-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: rgba(34,211,238,0.1); border-bottom: 1px solid var(--border); }
+    .terminal-title { font-size: 11px; color: var(--accent-cyan); font-weight: 700; }
+    .terminal-body { padding: 14px; max-height: 280px; overflow-y: auto; font-size: 11px; line-height: 1.7; color: #a1a1aa; }
+    .terminal-body div { padding: 1px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+    .terminal-body::-webkit-scrollbar { width: 4px; }
     .terminal-body::-webkit-scrollbar-track { background: transparent; }
-    .terminal-body::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
+    .terminal-body::-webkit-scrollbar-thumb { background: rgba(34,211,238,0.3); } }
 </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
         <div class="header-left">
-            <div class="bot-avatar">${ACCOUNT_NAME.charAt(0).toUpperCase()}</div>
+            <div class="bot-avatar">[OK]</div>
             <div>
                 <div class="bot-name">${ACCOUNT_NAME}</div>
                 <div class="bot-email">${account.email} • Port ${BOT_PORT}</div>
@@ -177,7 +176,7 @@ app.get('/', (req, res) => {
         <div class="engine-card engine-a">
             <div class="engine-header">
                 <div class="engine-title">
-                    <div class="engine-icon">⚡</div>
+                    <div class="engine-icon">[XHR]</div>
                     <div><div class="engine-label">Engine A</div><div class="engine-sublabel">XHR Interception</div></div>
                 </div>
                 <span class="engine-status status-armed">Armed</span>
@@ -190,7 +189,7 @@ app.get('/', (req, res) => {
         <div class="engine-card engine-b">
             <div class="engine-header">
                 <div class="engine-title">
-                    <div class="engine-icon">📄</div>
+                    <div class="engine-icon">[CSV]</div>
                     <div><div class="engine-label">Engine B</div><div class="engine-sublabel">CSV Download</div></div>
                 </div>
                 <span class="engine-status status-armed">Armed</span>
@@ -210,14 +209,13 @@ app.get('/', (req, res) => {
     </div>
 
     <div class="recent-txns">
-        <h3>💰 Recent Transactions</h3>
+        <h3>[ ] Recent Transactions</h3>
         <div id="txn-feed"><div class="empty-txn">Waiting for first transaction capture...</div></div>
     </div>
 
     <div class="terminal">
         <div class="terminal-header">
-            <div class="terminal-dots"><span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span></div>
-            <div class="terminal-title">dual-engine-stream — ${ACCOUNT_NAME}</div>
+            <div class="terminal-title">~/logs/dual-engine-stream.log</div>
         </div>
         <div class="terminal-body" id="term"></div>
     </div>
@@ -508,13 +506,10 @@ async function runDualPollingLoop() {
 }
 
 async function bootEngine() {
-    if (!account.report_id) {
-        log('[ERROR] Missing Merchant ID.');
-        await sendTelegram(`🚫 Bot ${ACCOUNT_NAME} missing Merchant ID.`);
-        engineRunning = false; return false;
+    let merchantUrl = 'https://pay.google.com/g4b/signup';
+    if (account.report_id) {
+        merchantUrl = `https://pay.google.com/g4b/transactions/${account.report_id}`;
     }
-
-    const merchantUrl = `https://pay.google.com/g4b/transactions/${account.report_id}`;
 
     try {
         log(`🚀 Booting Dual-Engine for ${ACCOUNT_NAME}...`);
@@ -562,7 +557,41 @@ async function bootEngine() {
 
         try {
             await enginePage.goto(merchantUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            log(`[SYSTEM] Anchored to transactions page`);
+            
+            try {
+                await enginePage.waitForURL(/BCR[A-Z0-9]{10,}/, { timeout: 15000 });
+            } catch(e) { } 
+
+            const currentUrl = enginePage.url();
+            const match = currentUrl.match(/(BCR[A-Z0-9]{10,})/);
+            
+            if (match && match[1]) {
+                if (account.report_id !== match[1]) {
+                    account.report_id = match[1];
+                    const fs = require('fs');
+                    const config = JSON.parse(fs.readFileSync(require('path').join(__dirname, '../config/accounts.json'), 'utf-8'));
+                    const idx = config.accounts.findIndex(a => a.name === ACCOUNT_NAME);
+                    if (idx !== -1) {
+                        config.accounts[idx].report_id = match[1];
+                        fs.writeFileSync(require('path').join(__dirname, '../config/accounts.json'), JSON.stringify(config, null, 4));
+                    }
+                    log(`[SYSTEM] 🎯 Auto-discovered Merchant ID: ${match[1]}`);
+                }
+                
+                if (!currentUrl.includes('/transactions')) {
+                    log('[SYSTEM] Routing to transactions view...');
+                    await enginePage.goto(`https://pay.google.com/g4b/transactions/${account.report_id}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                } else {
+                    log(`[SYSTEM] Anchored to transactions page`);
+                }
+            } else {
+                log(`[WARNING] Could not auto-discover Merchant ID. URL: ${currentUrl}`);
+                if (!account.report_id) {
+                    log('[ERROR] Missing Merchant ID and auto-discovery failed. Please login.');
+                    engineRunning = false;
+                    return false;
+                }
+            }
         } catch (e) { log(`[WARNING] Page goto: ${e.message}`); }
 
         log('[SYSTEM] ⚡ Engine A — ARMED');

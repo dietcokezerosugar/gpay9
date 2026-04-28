@@ -1,4 +1,7 @@
 {
+    "floxi_base_url": "https://floxi.online",
+    "floxi_bot_token": "",
+    "floxi_project_id": "",
     "webhook_url": "",
     "secondary_webhook_url": "",
     "telegram_bot_token": "",

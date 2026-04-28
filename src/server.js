@@ -4,6 +4,7 @@ const fs = require('fs');
 const { WebSocketServer } = require('ws');
 const http = require('http');
 const axios = require('axios');
+const FloxiClient = require('./floxi-client');
 const { chromium } = require('playwright');
 const {
     insertTransactionsBulk,
@@ -49,6 +50,25 @@ app.use(express.static(path.join(__dirname, '../dashboard')));
 
 function loadAccounts() { return JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf-8')); }
 function saveAccounts(config) { fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(config, null, 4)); }
+
+// --- Floxi PG Client Initialization ---
+let floxiClient = null;
+function initFloxi() {
+    const config = loadAccounts();
+    if (config.floxi_bot_token) {
+        floxiClient = new FloxiClient({
+            baseUrl: config.floxi_base_url || 'https://floxi.online',
+            botToken: config.floxi_bot_token,
+            projectId: config.floxi_project_id || '',
+            accounts: config.accounts || [],
+            logger: (msg) => console.log(msg)
+        });
+        floxiClient.connect().catch(err => console.log(`[FLOXI] Init error: ${err.message}`));
+    } else {
+        console.log('[FLOXI] No bot_token configured — Floxi integration disabled');
+    }
+}
+initFloxi();
 
 function broadcast(type, data) {
     const msg = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
@@ -140,9 +160,9 @@ app.post('/api/bots/:name/login', async (req, res) => {
         
         const page = await context.newPage();
         
-        // Dynamic merchant discovery
+        // Dynamic merchant discovery (Matches ANY URL containing a Merchant ID starting with BCR)
         page.on('framenavigated', frame => {
-            const match = frame.url().match(/https:\/\/pay\.google\.com\/g4b\/transactions\/([A-Z0-9]+)/);
+            const match = frame.url().match(/(BCR[A-Z0-9]{10,})/);
             if (match && match[1]) {
                 const config = loadAccounts();
                 const idx = config.accounts.findIndex(a => a.name === name);
@@ -154,7 +174,8 @@ app.post('/api/bots/:name/login', async (req, res) => {
             }
         });
 
-        await page.goto('https://pay.google.com/g4b/transactions');
+        // Go to signup/base page to ensure smooth login flow without error screens
+        await page.goto('https://pay.google.com/g4b/signup');
         
         context.on('close', () => {
             activeLoginSessions.delete(name);
@@ -173,9 +194,17 @@ function requireAuth(req, res, next) {
     const config = loadAccounts();
     const password = config.dashboard_password;
     if (!password) return next();
+    
+    let token = '';
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Auth required' });
-    if (authHeader.split(' ')[1] !== password) return res.status(401).json({ error: 'Invalid token' });
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    } else if (req.query.token) {
+        token = req.query.token;
+    }
+
+    if (!token) return res.status(401).json({ error: 'Auth required' });
+    if (token !== password) return res.status(401).json({ error: 'Invalid token' });
     next();
 }
 
@@ -217,7 +246,11 @@ app.get('/api/settings', (req, res) => {
             telegram_chat_id: config.telegram_chat_id || '',
             download_interval_sec: config.download_interval_sec || 40,
             webhook_status_secret: config.webhook_status_secret || '',
-            dashboard_password: config.dashboard_password || ''
+            dashboard_password: config.dashboard_password || '',
+            floxi_base_url: config.floxi_base_url || 'https://floxi.online',
+            floxi_bot_token: config.floxi_bot_token || '',
+            floxi_project_id: config.floxi_project_id || '',
+            floxi_status: floxiClient ? floxiClient.getStatus() : null
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -225,13 +258,21 @@ app.get('/api/settings', (req, res) => {
 app.put('/api/settings', (req, res) => {
     try {
         const config = loadAccounts();
-        const { webhook_url, telegram_bot_token, telegram_chat_id, download_interval_sec, webhook_status_secret, dashboard_password } = req.body;
+        const { webhook_url, telegram_bot_token, telegram_chat_id, download_interval_sec, webhook_status_secret, dashboard_password, floxi_base_url, floxi_bot_token, floxi_project_id } = req.body;
         if (webhook_url !== undefined) config.webhook_url = webhook_url;
         if (telegram_bot_token !== undefined) config.telegram_bot_token = telegram_bot_token;
         if (telegram_chat_id !== undefined) config.telegram_chat_id = telegram_chat_id;
         if (download_interval_sec !== undefined) config.download_interval_sec = parseInt(download_interval_sec) || 40;
         if (webhook_status_secret !== undefined) config.webhook_status_secret = webhook_status_secret;
         if (dashboard_password !== undefined) config.dashboard_password = dashboard_password;
+        if (floxi_base_url !== undefined) config.floxi_base_url = floxi_base_url;
+        if (floxi_bot_token !== undefined) config.floxi_bot_token = floxi_bot_token;
+        if (floxi_project_id !== undefined) config.floxi_project_id = floxi_project_id;
+        // Re-initialize Floxi client if credentials changed
+        if (floxi_bot_token !== undefined || floxi_base_url !== undefined || floxi_project_id !== undefined) {
+            if (floxiClient) floxiClient.disconnect().catch(() => {});
+            initFloxi();
+        }
         saveAccounts(config);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -327,20 +368,41 @@ async function dispatchWebhook(account, transactions) {
     if (!transactions || transactions.length === 0) return;
     const config = loadAccounts();
     const accountConfig = config.accounts.find(a => a.name === account) || {};
+
+    // --- FLOXI PRIMARY: Match transactions against pending Floxi orders first ---
+    if (floxiClient) {
+        try {
+            // Inject account name into each transaction so Floxi gets the full picture
+            const enrichedTxns = transactions.map(tx => ({ ...tx, account }));
+            const result = await floxiClient.matchAndConfirm(enrichedTxns);
+            if (result.matched.length > 0) {
+                insertBotEvent.run(account, 'floxi_match', `Matched ${result.matched.length} txn(s) to Floxi orders`);
+                // Mark matched transactions as webhook-sent
+                for (const m of result.matched) {
+                    markWebhookSuccess(m.transaction.transaction_id);
+                }
+            }
+        } catch (e) {
+            insertBotEvent.run(account, 'floxi_error', `Floxi dispatch error: ${e.message}`);
+        }
+    }
+
+    // --- SECONDARY: Existing webhook URLs (bloomxpe, webhook.site, etc.) ---
     const urls = [accountConfig.webhook_url || config.webhook_url, accountConfig.secondary_webhook_url || config.secondary_webhook_url].filter(Boolean);
     if (urls.length === 0) return;
 
-    for (const tx of transactions) {
-        for (const url of urls) {
-            try {
-                await axios.post(url, tx, { timeout: 15000 });
-                if (url === (accountConfig.webhook_url || config.webhook_url)) markWebhookSuccess(tx.transaction_id);
-            } catch (e) {
-                insertBotEvent.run(account, 'webhook_error', `Failure for ${tx.transaction_id}: ${e.message}`);
-                incrementWebhookAttempts(tx.transaction_id);
-            }
-        }
-    }
+    const primaryUrl = accountConfig.webhook_url || config.webhook_url;
+    const promises = transactions.flatMap(tx =>
+        urls.map(url =>
+            axios.post(url, tx, { timeout: 15000 })
+                .then(() => { if (url === primaryUrl) markWebhookSuccess(tx.transaction_id); })
+                .catch(e => {
+                    insertBotEvent.run(account, 'webhook_error', `Failure for ${tx.transaction_id}: ${e.message}`);
+                    incrementWebhookAttempts(tx.transaction_id);
+                })
+        )
+    );
+    await Promise.allSettled(promises);
 }
 
 app.post('/api/report', async (req, res) => {
@@ -384,8 +446,30 @@ app.get('/api/analytics/summary', async (req, res) => {
             settled: acc.settled + a.settled_amount,
             pending: acc.pending + a.pending_amount
         }), { transactions: 0, amount: 0, net: 0, settled: 0, pending: 0 });
-        res.json({ totals, perAccount: fleet, activeBots: pm2Status.filter(p => p.status === 'online').length, totalBots: config.accounts.length });
+        const floxiStatus = floxiClient ? floxiClient.getStatus() : null;
+        res.json({ totals, perAccount: fleet, activeBots: pm2Status.filter(p => p.status === 'online').length, totalBots: config.accounts.length, floxi: floxiStatus });
     } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/floxi/logs', (req, res) => {
+    try {
+        const logs = floxiClient ? floxiClient.getLogs() : [];
+        res.json(logs);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/floxi/stream', (req, res) => {
+    if (!floxiClient) return res.status(404).json({ error: 'Floxi not configured' });
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+    floxiClient.addSSEClient(res);
+    // Send existing logs as initial burst
+    const existing = floxiClient.getLogs();
+    existing.forEach(entry => {
+        res.write(`data: ${JSON.stringify(entry)}\n\n`);
+    });
 });
 
 app.get('/api/events', (req, res) => {
@@ -471,3 +555,13 @@ app.get('/api/analytics/distribution', (req, res) => {
 
 wss.on('connection', ws => ws.send(JSON.stringify({ type: 'connected', data: { message: 'Gateway connected' } })));
 server.listen(PORT, () => console.log(`Server initialized on port ${PORT}`));
+
+// Graceful shutdown — disconnect Floxi
+process.on('SIGINT', async () => {
+    if (floxiClient) await floxiClient.disconnect().catch(() => {});
+    process.exit(0);
+});
+process.on('SIGTERM', async () => {
+    if (floxiClient) await floxiClient.disconnect().catch(() => {});
+    process.exit(0);
+});

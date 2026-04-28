@@ -360,9 +360,10 @@ const App = {
                     ${status === 'online'
                         ? `<button class="btn btn-danger btn-sm" onclick="botAction('stop','${acc.name}')">⏹ Stop</button>
                            <button class="btn btn-ghost btn-sm" onclick="botAction('restart','${acc.name}')">🔄 Restart</button>
-                           <button class="btn btn-primary btn-sm" onclick="window.open('http://localhost:${acc.port}', '_blank', 'width=800,height=600')">🖥️ Live Panel</button>`
+                           <button class="btn btn-primary btn-sm" style="background:#a855f7;border:none;color:white" onclick="openLiveLogsPanel('${acc.name}', ${acc.port})">🖥️ Live Logs</button>`
                         : `<button class="btn btn-ghost btn-sm" onclick="botAction('login','${acc.name}')">🔑 Login</button>
-                           <button class="btn btn-success btn-sm" onclick="botAction('start','${acc.name}')">▶ Start</button>`
+                           <button class="btn btn-success btn-sm" onclick="botAction('start','${acc.name}')">▶ Start</button>
+                           <button class="btn btn-ghost btn-sm" style="color:#a855f7;border-color:rgba(168,85,247,0.3)" onclick="openLiveLogsPanel(null, null)">📡 Floxi Logs</button>`
                     }
                     <button class="btn btn-ghost btn-sm reset-session-btn" style="margin-left:auto;color:var(--accent-red);border-color:rgba(239, 68, 68, 0.2)" onclick="botAction('reset','${acc.name}')">🗑️ Reset Session</button>
                 </div>
@@ -802,6 +803,37 @@ const App = {
                 </div>
             </div>
 
+            <div class="settings-card" style="border-left:3px solid #a855f7">
+                <h3>🔮 Floxi PG Integration <span id="floxi-status-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;margin-left:10px;font-weight:600;${config.floxi_status?.connected ? 'background:rgba(16,185,129,0.15);color:#10b981' : 'background:rgba(239,68,68,0.15);color:#ef4444'}">${config.floxi_status?.connected ? '● Connected' : '○ Disconnected'}</span></h3>
+                <div class="form-group">
+                    <label>Floxi Base URL</label>
+                    <input id="s-floxi-url" placeholder="https://floxi.online" value="${config.floxi_base_url || 'https://floxi.online'}">
+                </div>
+                <div class="form-group">
+                    <label>Bot Token</label>
+                    <input id="s-floxi-token" type="password" placeholder="Your Floxi bot token" value="${config.floxi_bot_token || ''}">
+                </div>
+                <div class="form-group">
+                    <label>Project ID</label>
+                    <input id="s-floxi-project" placeholder="e.g. 2" value="${config.floxi_project_id || ''}">
+                </div>
+                ${config.floxi_status ? `
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px">
+                    <div class="account-stat">
+                        <div class="stat-label">Orders Matched</div>
+                        <div class="stat-value" style="font-size:16px;color:var(--accent-green)">${config.floxi_status.stats?.ordersMatched || 0}</div>
+                    </div>
+                    <div class="account-stat">
+                        <div class="stat-label">Heartbeats</div>
+                        <div class="stat-value" style="font-size:16px">${config.floxi_status.stats?.heartbeats || 0}</div>
+                    </div>
+                    <div class="account-stat">
+                        <div class="stat-label">Cached Orders</div>
+                        <div class="stat-value" style="font-size:16px">${config.floxi_status.cachedOrders || 0}</div>
+                    </div>
+                </div>
+                ` : ''}
+
             <div class="settings-card">
                 <h3>📥 Incoming Status Webhook</h3>
                 <div class="form-group">
@@ -861,7 +893,10 @@ const App = {
             telegram_chat_id: config.telegram_chat_id,     // Preserve TG chat
             download_interval_sec: parseInt(document.getElementById('s-download-interval').value) || 10,
             webhook_status_secret: document.getElementById('s-webhook-secret').value.trim(),
-            dashboard_password: document.getElementById('s-admin-password').value.trim()
+            dashboard_password: document.getElementById('s-admin-password').value.trim(),
+            floxi_base_url: document.getElementById('s-floxi-url').value.trim(),
+            floxi_bot_token: document.getElementById('s-floxi-token').value.trim(),
+            floxi_project_id: document.getElementById('s-floxi-project').value.trim()
         };
 
         try {
@@ -945,6 +980,114 @@ function showToast(message, type = 'info') {
         toast.style.transition = 'all 0.3s';
         setTimeout(() => toast.remove(), 300);
     }, 4000);
+}
+
+// ===== FLOXI LOG PANEL =====
+
+function openLiveLogsPanel(botName, botPort) {
+    // Remove existing panel if open
+    document.querySelector('.floxi-panel-overlay')?.remove();
+
+    const isSplit = !!botName && !!botPort;
+    const title = isSplit ? `🖥️ ${botName} Live Logs` : `📡 Floxi PG Live`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay floxi-panel-overlay';
+    overlay.innerHTML = `
+        <div class="modal" style="width:95vw;max-width:${isSplit ? '1400px' : '750px'};height:85vh;display:flex;flex-direction:column;border-left:3px solid #a855f7">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-shrink:0">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <h2 style="margin:0">${title}</h2>
+                    <span id="floxi-live-dot" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(16,185,129,0.15);color:#10b981"><span style="width:6px;height:6px;background:#10b981;border-radius:50%;display:inline-block;animation:pulse 2s ease-in-out infinite"></span>STREAMING</span>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="this.closest('.floxi-panel-overlay').remove()" style="font-size:18px;padding:4px 10px">✕</button>
+            </div>
+            
+            <div style="display:flex;flex:1;gap:20px;overflow:hidden">
+                ${isSplit ? `
+                <!-- Bot Panel Left Side -->
+                <div style="flex:1;display:flex;flex-direction:column;border:1px solid rgba(34,211,238,0.3);border-radius:10px;overflow:hidden;box-shadow:0 0 30px rgba(34,211,238,0.05)">
+                    <div style="background:#083344;padding:10px 16px;font-size:12px;font-weight:600;font-family:'JetBrains Mono',monospace;border-bottom:1px solid rgba(34,211,238,0.3);color:#22d3ee;display:flex;justify-content:space-between;align-items:center;letter-spacing:0.5px">
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span style="display:inline-block;width:8px;height:12px;background:#22d3ee;box-shadow:0 0 8px #22d3ee;animation:pulse 2s ease-in-out infinite"></span>
+                            <span><span style="color:#67e8f9">root@bot</span>:~/${botName}$</span>
+                        </div>
+                        <span style="font-size:10px;color:rgba(34,211,238,0.8);background:rgba(34,211,238,0.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(34,211,238,0.3)">tcp:${botPort}</span>
+                    </div>
+                    <iframe src="http://localhost:${botPort}" style="width:100%;height:100%;border:none;background:var(--bg-darker)"></iframe>
+                </div>
+                ` : ''}
+                
+                <!-- Floxi Logs Right Side -->
+                <div style="flex:1;display:flex;flex-direction:column;border:1px solid rgba(168,85,247,0.3);border-radius:10px;overflow:hidden;box-shadow:0 0 30px rgba(168,85,247,0.05)">
+                    <div style="background:#2e1065;padding:10px 16px;font-size:12px;font-weight:600;font-family:'JetBrains Mono',monospace;border-bottom:1px solid rgba(168,85,247,0.3);color:#c084fc;display:flex;justify-content:space-between;align-items:center;letter-spacing:0.5px">
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span style="display:inline-block;width:8px;height:8px;background:#a855f7;border-radius:50%;box-shadow:0 0 10px #a855f7"></span>
+                            <span>[floxi-gateway] stream</span>
+                        </div>
+                        <span style="font-size:10px;color:rgba(192,132,252,0.8);background:rgba(168,85,247,0.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(168,85,247,0.3)">sse:live</span>
+                    </div>
+                    <div id="floxi-log-stream" style="flex:1;overflow-y:auto;background:rgba(0,0,0,0.5);padding:14px;font-family:'JetBrains Mono',monospace;font-size:12px;line-height:1.8"></div>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:12px;flex-shrink:0">
+                <span style="font-size:11px;color:var(--text-muted);margin-right:16px" id="floxi-log-count">0 entries</span>
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('floxi-log-stream').innerHTML='';" style="font-size:11px">Clear Floxi Logs</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    const stream = document.getElementById('floxi-log-stream');
+    let entryCount = 0;
+
+    function colorize(msg) {
+        if (msg.includes('✅') || msg.includes('Matched') || msg.includes('Synced')) return '#10b981';
+        if (msg.includes('❌') || msg.includes('error') || msg.includes('Error')) return '#ef4444';
+        if (msg.includes('⚠')) return '#f59e0b';
+        if (msg.includes('🎯') || msg.includes('💸')) return '#a855f7';
+        if (msg.includes('🔌') || msg.includes('📡')) return '#6366f1';
+        if (msg.includes('📋')) return '#22d3ee';
+        return '#94a3b8';
+    }
+
+    function appendLog(entry) {
+        const div = document.createElement('div');
+        div.style.padding = '2px 0';
+        div.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+        const time = new Date(entry.time).toLocaleTimeString('en-IN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        div.innerHTML = `<span style="color:var(--text-muted);margin-right:10px">${time}</span><span style="color:${colorize(entry.msg)}">${entry.msg}</span>`;
+        stream.appendChild(div);
+        stream.scrollTop = stream.scrollHeight;
+        entryCount++;
+        const counter = document.getElementById('floxi-log-count');
+        if (counter) counter.textContent = entryCount + ' entries';
+    }
+
+    // Connect to SSE stream
+    const token = localStorage.getItem('gpay_admin_token') || '';
+    const evtSource = new EventSource(`/api/floxi/stream?token=${encodeURIComponent(token)}`);
+    evtSource.onmessage = (e) => {
+        try {
+            const entry = JSON.parse(e.data);
+            appendLog(entry);
+        } catch (err) {}
+    };
+    evtSource.onerror = () => {
+        const dot = document.getElementById('floxi-live-dot');
+        if (dot) { dot.style.background = 'rgba(239,68,68,0.15)'; dot.style.color = '#ef4444'; dot.innerHTML = '<span style="width:6px;height:6px;background:#ef4444;border-radius:50%;display:inline-block"></span>DISCONNECTED'; }
+    };
+
+    // Cleanup SSE on panel close
+    const obs = new MutationObserver(() => {
+        if (!document.querySelector('.floxi-panel-overlay')) {
+            evtSource.close();
+            obs.disconnect();
+        }
+    });
+    obs.observe(document.body, { childList: true });
 }
 
 // ===== BOOT =====
