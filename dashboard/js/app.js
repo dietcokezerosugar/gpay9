@@ -362,8 +362,7 @@ const App = {
                            <button class="btn btn-ghost btn-sm" onclick="botAction('restart','${acc.name}')">🔄 Restart</button>
                            <button class="btn btn-primary btn-sm" style="background:#a855f7;border:none;color:white" onclick="openLiveLogsPanel('${acc.name}', ${acc.port})">🖥️ Live Logs</button>`
                         : `<button class="btn btn-ghost btn-sm" onclick="botAction('login','${acc.name}')">🔑 Login</button>
-                           <button class="btn btn-success btn-sm" onclick="botAction('start','${acc.name}')">▶ Start</button>
-                           <button class="btn btn-ghost btn-sm" style="color:#a855f7;border-color:rgba(168,85,247,0.3)" onclick="openLiveLogsPanel(null, null)">📡 Floxi Logs</button>`
+                           <button class="btn btn-success btn-sm" onclick="botAction('start','${acc.name}')">▶ Start</button>`
                     }
                     <button class="btn btn-ghost btn-sm reset-session-btn" style="margin-left:auto;color:var(--accent-red);border-color:rgba(239, 68, 68, 0.2)" onclick="botAction('reset','${acc.name}')">🗑️ Reset Session</button>
                 </div>
