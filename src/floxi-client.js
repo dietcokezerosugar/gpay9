@@ -103,10 +103,10 @@ class FloxiClient {
                 this.log(`[FLOXI] ✅ Connected to Floxi PG (connection: ${this.connectionId || 'active'})`);
                 this._startHeartbeat();
                 return true;
-            } else {
-                this.log(`[FLOXI] ❌ Connect failed: ${res.data.message || 'Unknown error'}`);
-                return false;
             }
+
+            this.log(`[FLOXI] ❌ Connect failed: ${res.data.message || 'Unknown error'}`);
+            return false;
         } catch (err) {
             this.log(`[FLOXI] ❌ Connect error: ${err.message}`);
             // Still start heartbeat — it will auto-retry connections
@@ -130,7 +130,7 @@ class FloxiClient {
                 timestamp: new Date().toISOString(),
                 accounts: this.accounts.map(acc => ({
                     name: acc.name,
-                    status: 'active',
+                    status: 'inactive',
                     pg_id: parseInt(this.projectId) || 1
                 }))
             }, {
@@ -141,11 +141,9 @@ class FloxiClient {
             this.stats.heartbeats++;
             this.stats.lastHeartbeat = new Date().toISOString();
 
-            if (res.data.status === 'success') {
-                if (!this.connected) {
-                    this.connected = true;
-                    this.log('[FLOXI] \u{1F504} Reconnected via heartbeat');
-                }
+            if (res.data.status === 'success' && !this.connected) {
+                this.connected = true;
+                this.log('[FLOXI] \u{1F504} Reconnected via heartbeat');
             }
         } catch (err) {
             // Only log the first failure, don't spam
@@ -158,27 +156,43 @@ class FloxiClient {
 
     /**
      * Sync GPay account statuses to Floxi so it knows where to assign orders
+     * Default: all accounts are sent as inactive.
+     * If runtime /api/accounts snapshot is provided, pm2 online accounts are sent as active.
      */
-    async syncAccounts() {
-        if (!this.botToken || this.accounts.length === 0) return;
+    async syncAccounts(runtimeAccounts = null) {
+        if (!this.botToken) return;
+
+        const hasRuntimeSnapshot = Array.isArray(runtimeAccounts) && runtimeAccounts.length > 0;
+        const sourceAccounts = hasRuntimeSnapshot ? runtimeAccounts : this.accounts;
+        if (!Array.isArray(sourceAccounts) || sourceAccounts.length === 0) return;
+
+        const payloadAccounts = sourceAccounts.map(acc => {
+            const isOnline = String(acc?.pm2?.status || '').toLowerCase() === 'online';
+            return {
+                id: acc.id,
+                name: acc.name,
+                username: acc.email,
+                password: acc.password,
+                pa: acc.pa,
+                pn: acc.pn,
+                status: hasRuntimeSnapshot && isOnline ? 'active' : 'inactive',
+                pg_id: parseInt(this.projectId) || 1
+            };
+        });
 
         try {
-            const res = await axios.post(`${this.baseUrl}/api/bot/accounts.php`, {
+            const res = await axios.post(`${this.baseUrl}/api/bot/raccounts.php`, {
                 connection_id: this.connectionId,
                 project_id: this.projectId,
-                accounts: this.accounts.map(acc => ({
-                    name: acc.name,
-                    email: acc.email,
-                    status: 'active',
-                    pg_id: parseInt(this.projectId) || 1
-                }))
+                accounts: payloadAccounts
             }, {
                 headers: this._headers(),
                 timeout: 10000
             });
 
             if (res.data.status === 'success') {
-                this.log(`[FLOXI] \u{1F4E1} Synced ${this.accounts.length} PG account(s) to Floxi`);
+                const activeCount = payloadAccounts.filter(a => a.status === 'active').length;
+                this.log(`[FLOXI] \u{1F4E1} Synced ${payloadAccounts.length} PG account(s) to Floxi (${activeCount} active)`);
             }
         } catch (err) {
             this.log(`[FLOXI] \u26A0 Account sync error: ${err.message}`);
