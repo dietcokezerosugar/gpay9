@@ -233,6 +233,13 @@ app.get('/api/accounts', async (req, res) => {
             const summary = getAccountSummary(acc.name);
             return { name: acc.name, email: acc.email, report_id: acc.report_id, pm2: pm2Info, stats: summary, port: 5001 + idx };
         });
+
+        if (floxiClient) {
+            floxiClient.syncAccounts(accounts).catch(err => {
+                console.log(`[FLOXI] Account sync from /api/accounts failed: ${err.message}`);
+            });
+        }
+
         res.json({ accounts });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
