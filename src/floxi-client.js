@@ -91,7 +91,9 @@ class FloxiClient {
         try {
             this.log(`[FLOXI] 🔌 Connecting to ${this.baseUrl}...`);
             const res = await axios.post(`${this.baseUrl}/api/bot/connect.php`, {
-                project_id: this.projectId
+                connection_id: this.connectionId,
+                active_pg_ids: [parseInt(this.projectId) || 1],
+                pg_ids: [parseInt(this.projectId) || 1]
             }, {
                 headers: this._headers(),
                 timeout: 15000
@@ -124,14 +126,9 @@ class FloxiClient {
         try {
             const res = await axios.post(`${this.baseUrl}/api/bot/heartbeat.php`, {
                 connection_id: this.connectionId,
-                project_id: this.projectId,
-                status: 'online',
-                uptime: Math.floor(process.uptime()),
-                timestamp: new Date().toISOString(),
                 accounts: this.accounts.map(acc => ({
-                    name: acc.name,
-                    status: 'inactive',
-                    pg_id: parseInt(this.projectId) || 1
+                    pg_id: parseInt(this.projectId) || 1,
+                    status: 'DISABLED'
                 }))
             }, {
                 headers: this._headers(),
@@ -169,21 +166,14 @@ class FloxiClient {
         const payloadAccounts = sourceAccounts.map(acc => {
             const isOnline = String(acc?.pm2?.status || '').toLowerCase() === 'online';
             return {
-                id: acc.id,
-                name: acc.name,
-                username: acc.email,
-                password: acc.password,
-                pa: acc.pa,
-                pn: acc.pn,
-                status: hasRuntimeSnapshot && isOnline ? 'active' : 'inactive',
-                pg_id: parseInt(this.projectId) || 1
+                pg_id: parseInt(this.projectId) || 1,
+                status: hasRuntimeSnapshot && isOnline ? 'ACTIVE' : 'DISABLED'
             };
         });
 
         try {
             const res = await axios.post(`${this.baseUrl}/api/bot/accounts.php`, {
                 connection_id: this.connectionId,
-                project_id: this.projectId,
                 accounts: payloadAccounts
             }, {
                 headers: this._headers(),
@@ -220,7 +210,7 @@ class FloxiClient {
         try {
             const res = await axios.get(`${this.baseUrl}/api/bot/orders.php`, {
                 headers: this._headers(),
-                params: { project_id: this.projectId },
+                params: { connection_id: this.connectionId },
                 timeout: 10000
             });
 
@@ -252,31 +242,11 @@ class FloxiClient {
         try {
             this.log(`[FLOXI] 💸 Confirming payment for order ${orderId} (₹${transactionData.amount})`);
             const res = await axios.post(`${this.baseUrl}/api/bot/webhook.php`, {
-                // Core Floxi fields
-                event: 'payment.success',
                 order_id: orderId,
                 order_status: 'SUCCESS',
+                connection_id: this.connectionId,
                 utr: transactionData.utr || transactionData.transaction_id || '',
-                amount: String(transactionData.amount),
-                currency: 'INR',
-                project_id: this.projectId,
-                timestamp: transactionData.creation_time || new Date().toISOString(),
-
-                // Full transaction details (mirrors dashboard data exactly)
-                payer: transactionData.payer || '',
-                paid_via: transactionData.paid_via || 'UPI',
-                transaction_id: transactionData.transaction_id || '',
-                transaction_type: transactionData.type || 'Payment',
-                net_amount: String(transactionData.net_amount || transactionData.amount),
-                processing_fee: String(transactionData.processing_fee || 0),
-                status: transactionData.status || 'Completed',
-                creation_time: transactionData.creation_time || '',
-                update_time: transactionData.update_time || new Date().toISOString(),
-                notes: transactionData.notes || '',
-                account: transactionData.account || '',
-
-                // Attach complete raw transaction as backup
-                full_data: transactionData
+                pg_id: parseInt(this.projectId) || 1
             }, {
                 headers: this._headers(),
                 timeout: 15000
@@ -402,8 +372,7 @@ class FloxiClient {
 
         try {
             await axios.post(`${this.baseUrl}/api/bot/disconnect.php`, {
-                connection_id: this.connectionId,
-                project_id: this.projectId
+                connection_id: this.connectionId
             }, {
                 headers: this._headers(),
                 timeout: 10000
