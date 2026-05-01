@@ -126,7 +126,7 @@ class GatewayAblyClient extends GatewayClient {
         }, {
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.botToken}`
+                'x-bot-token': this.botToken
             },
             timeout: 15000
         });
@@ -202,7 +202,7 @@ class GatewayAblyClient extends GatewayClient {
         this._log(`[Ably] Reporting transaction via REST: ${data.transaction?.transaction_id || data.transaction_id}`);
         
 
-        this._reportRest('/api/bot/orders.php', {
+        this._reportRest('/api/bot/webhook.php', {
             order_id: data.transaction?.transaction_id || data.transaction_id,
             order_status: 'SUCCESS',
             utr: data.transaction?.utr || data.utr,

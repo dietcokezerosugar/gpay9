@@ -56,7 +56,7 @@ class GatewayClient extends EventEmitter {
             }, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.botToken}`
+                    'x-bot-token': this.botToken
                 },
                 timeout: 10000
             });
