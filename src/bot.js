@@ -1,4 +1,4 @@
-﻿
+
 const express = require('express');
 const { chromium } = require('playwright');
 const path = require('path');
@@ -34,6 +34,7 @@ let isInitialLoad = true;
 
 let statsEngineA = { captured: 0, lastCapture: null };
 let statsEngineB = { captured: 0, lastCapture: null, lastDownload: null };
+const knownTransactions = new Set();
 
 const app = express();
 app.use(express.json());
