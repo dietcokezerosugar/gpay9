@@ -400,14 +400,24 @@ async function dispatchWebhook(account, transactions) {
 
     const primaryUrl = accountConfig.webhook_url || config.webhook_url;
     const promises = transactions.flatMap(tx =>
-        urls.map(url =>
-            axios.post(url, tx, { timeout: 15000 })
+        urls.map(url => {
+            const payload = {
+                event: "payment.success",
+                order_id: tx.transaction_id,
+                amount: String(tx.amount || 0),
+                currency: "INR",
+                order_status: "SUCCESS",
+                utr: tx.transaction_id,
+                project_id: parseInt(config.floxi_project_id) || 1,
+                timestamp: tx.creation_time || new Date().toISOString()
+            };
+            return axios.post(url, payload, { timeout: 15000 })
                 .then(() => { if (url === primaryUrl) markWebhookSuccess(tx.transaction_id); })
                 .catch(e => {
                     insertBotEvent.run(account, 'webhook_error', `Failure for ${tx.transaction_id}: ${e.message}`);
                     incrementWebhookAttempts(tx.transaction_id);
-                })
-        )
+                });
+        })
     );
     await Promise.allSettled(promises);
 }
