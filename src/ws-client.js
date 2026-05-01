@@ -161,8 +161,12 @@ class GatewayWSClient extends GatewayClient {
         
 
         this._reportRest('/api/bot/webhook.php', {
+            event: 'payment.success',
             order_id: data.transaction?.transaction_id || data.transaction_id,
             order_status: 'SUCCESS',
+            currency: 'INR',
+            project_id: this.projectId || 1,
+            timestamp: new Date().toISOString(),
             utr: data.transaction?.utr || data.utr,
             amount: data.transaction?.amount || data.amount,
             payer: data.transaction?.payer || data.payer,

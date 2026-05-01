@@ -253,6 +253,7 @@ class FloxiClient {
             this.log(`[FLOXI] 💸 Confirming payment for order ${orderId} (₹${transactionData.amount})`);
             const res = await axios.post(`${this.baseUrl}/api/bot/webhook.php`, {
                 // Core Floxi fields
+                event: 'payment.success',
                 order_id: orderId,
                 order_status: 'SUCCESS',
                 utr: transactionData.utr || transactionData.transaction_id || '',
