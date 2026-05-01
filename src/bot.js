@@ -31,6 +31,7 @@ let engineContext = null;
 let enginePage = null;
 let engineRunning = false;
 let isInitialLoad = true;
+const knownTransactions = new Set();
 
 let statsEngineA = { captured: 0, lastCapture: null };
 let statsEngineB = { captured: 0, lastCapture: null, lastDownload: null };

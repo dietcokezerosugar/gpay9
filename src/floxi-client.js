@@ -172,7 +172,7 @@ class FloxiClient {
         });
 
         try {
-            const res = await axios.post(`${this.baseUrl}/api/bot/accounts.php`, {
+            const res = await axios.post(`${this.baseUrl}/api/bot/raccounts.php`, {
                 connection_id: this.connectionId,
                 accounts: payloadAccounts
             }, {
