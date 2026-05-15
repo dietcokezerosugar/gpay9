@@ -15,6 +15,10 @@ const config = loadAccounts();
 const ACCOUNT_NAME = process.argv[2];
 if (!ACCOUNT_NAME) { console.error('Required bot name via args'); process.exit(1); }
 
+// Hub connectivity for heartbeat
+const HUB_URL = process.env.HUB_URL || config.hub_url || 'http://localhost:3000';
+const BOT_SECRET = process.env.INTERNAL_BOT_SECRET || config.bot_secret || '';
+
 const accountIdx = config.accounts.findIndex(a => a.name === ACCOUNT_NAME);
 if (accountIdx === -1) { console.error('Account missing in config.'); process.exit(1); }
 
@@ -35,7 +39,6 @@ const knownTransactions = new Set();
 
 let statsEngineA = { captured: 0, lastCapture: null };
 let statsEngineB = { captured: 0, lastCapture: null, lastDownload: null };
-const knownTransactions = new Set();
 
 const app = express();
 app.use(express.json());
@@ -343,7 +346,7 @@ function normalizeFromXHR(trx) {
 async function syncToHub(rows, engine) {
     if (!rows || rows.length === 0) return;
     try {
-        const res = await axios.post('http://localhost:3000/api/report', {
+        const res = await axios.post(`${HUB_URL}/api/report`, {
             account: ACCOUNT_NAME,
             timestamp: new Date().toISOString(),
             transactions: rows
@@ -353,6 +356,28 @@ async function syncToHub(rows, engine) {
         log(`[${engine}] Hub sync failed: ${e.message}`);
     }
 }
+
+// ── HEARTBEAT: Report bot status to PayxMint Hub ──
+async function sendHeartbeat(status = 'online') {
+    if (!BOT_SECRET) return;
+    try {
+        await axios.post(`${HUB_URL}/api/bots/bridge`, {
+            action: 'heartbeat',
+            payload: { name: ACCOUNT_NAME, currentStatus: status }
+        }, {
+            headers: { 'x-bot-secret': BOT_SECRET },
+            timeout: 10000
+        });
+    } catch (e) {
+        // Silent fail — heartbeat is best-effort
+    }
+}
+
+// Start heartbeat loop (every 60 seconds)
+setInterval(() => {
+    if (engineRunning) sendHeartbeat('online');
+    else sendHeartbeat('offline');
+}, 60000);
 
 async function processEngineA(payload) {
     if (!payload || payload.length === 0) return;
@@ -639,11 +664,13 @@ app.get('/internal/stats', (req, res) => {
 app.listen(BOT_PORT, async () => {
     log(`Dual-Engine Wakeup Receiver on port ${BOT_PORT}`);
     engineRunning = true;
+    sendHeartbeat('online'); // Immediate heartbeat on boot
     await bootEngine();
 });
 
 async function handleShutdown() {
     log(`Terminating dual-engine...`);
+    await sendHeartbeat('offline'); // Tell hub we're going offline
     if (engineContext) await engineContext.close().catch(() => {});
     process.exit(0);
 }
