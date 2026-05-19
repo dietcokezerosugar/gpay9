@@ -512,6 +512,15 @@ async function runEngineB() {
 
 async function runDualPollingLoop() {
     if (!engineRunning) return;
+
+    // PM2 Autorestart Memory Guard: Once it reaches 300MB RSS, trigger bot restart
+    const rssUsage = process.memoryUsage().rss / 1024 / 1024;
+    if (rssUsage > 300) {
+        log(`[STABILITY] 🔄 Memory threshold exceeded (RSS: ${Math.round(rssUsage)}MB > 300MB). Triggering PM2 bot auto-restart...`);
+        try { if (engineContext) await engineContext.close(); } catch(e) {}
+        process.exit(1);
+    }
+
     try {
         log('[DUAL] 🔄 Sweep cycle starting...');
         
